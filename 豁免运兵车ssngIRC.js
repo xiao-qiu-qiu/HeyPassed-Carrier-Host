@@ -197,7 +197,7 @@ function isInZhiYeZhanZheng() {
         const inv = Player.openInventory();
         if (!inv) return false;
         const title = inv.getContainerTitle();
-        if (title === "合成" && inv.getSlot(44)?.getName()?.getString() === "职业解锁! (长按点击!)") {
+        if (title === "合成" && inv.getSlot(36)?.getName()?.getString() === "职业 (长按点击!)") {
             return true;
         }
     } catch (e) {
@@ -227,7 +227,7 @@ function checkSurroundingChunkLoaded(detectRange) {
 
 function ircTell(ircId, msg) {
     Chat.say(`.irc chat $tell ${ircId} ${msg}`)
-    log(`.irc chat $tell ${ircId} ${msg}`)
+    // log(`.irc chat $tell ${ircId} ${msg}`)
 }
 
 function formatDuration(durationMs) {
@@ -419,6 +419,19 @@ function joinGame(gamemode) {
                 switchHotbar(3)
                 safeSleep(300)
             }
+        } else if (config.type === 'zyzz') {
+            // 进行职业战争特殊处理
+            if (!isInHub()) return false;
+            if (!Player.getPlayer()) return false;
+            switchHotbar(0)
+            safeSleep(50)
+            if (!Player.getPlayer()) return false;
+            Player.getInteractionManager().interactItem(false)
+            waitScreen("玩法选择", 1000)
+            Player.openInventory().click(13) // 职业战争是13号槽
+            waitUntil(isInZhiYeZhanZheng, 2000)
+            safeSleep(300)
+            return true
         }
 
         // 传送到NPC位置
@@ -626,9 +639,10 @@ const queueSystem = {
         log(`开始处理队列: 玩家ID=${current.playerId}, 玩法=${current.gamemode}`, "info");
         log(`开始计时: 玩家 ${current.playerId} (${current.gamemode})`, "info");
 
-        // 职业战争特殊处理：先进入游戏，再拉人
-        if (GAMEMODES[current.gamemode]?.type === 'zyzz') {
-            log(`⚡ 职业战争：先进入游戏...`, "info");
+        // 职业战争和BW特殊处理：先进入游戏，再拉人
+        if (GAMEMODES[current.gamemode]?.type === 'zyzz' || GAMEMODES[current.gamemode]?.type === 'bw') {
+            const gameName = GAMEMODES[current.gamemode]?.type === 'zyzz' ? '职业战争' : '起床战争';
+            log(`⚡ ${gameName}：先进入游戏...`, "info");
             if (!joinGame(current.gamemode)) {
                 log(`进入${current.gamemode}失败，跳过`, "error");
                 ircTell(current.ircId, `进入${current.gamemode}失败，请稍后重试`);
@@ -796,15 +810,16 @@ if (isEnabled()) {
                         current.status = 'accepted';
                         current.acceptedTime = Date.now();
 
-                        // 如果职业战争已经提前进入游戏，则直接 warp
+                        // 如果已经提前进入游戏（职业战争或BW），则直接 warp
                         if (current.gameJoined) {
-                            log(`⚡ 职业战争：直接执行 zdWarp...`, "info");
+                            const gameName = GAMEMODES[current.gamemode]?.type === 'zyzz' ? '职业战争' : '起床战争';
+                            log(`⚡ ${gameName}：直接执行 zdWarp...`, "info");
                             zdWarp();
                             queueSystem.completeCurrentAndNext();
                             return;
                         }
 
-                        // 非职业战争或其他玩法：进入游戏后再 warp
+                        // 其他玩法（SW等）：进入游戏后再 warp
                         log(`⚡ 执行 joinGame...`, "info");
                         if (!joinGame(current.gamemode)) {
                             log(`进入${current.gamemode}失败，跳过`, "error");
